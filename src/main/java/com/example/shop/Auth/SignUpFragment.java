@@ -1,6 +1,8 @@
 package com.example.shop.Auth;
 
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Bundle;
 
@@ -24,19 +26,22 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.android.volley.Request;
+import com.android.volley.RequestQueue;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.JsonObjectRequest;
+import com.android.volley.toolbox.Volley;
+import com.example.shop.ChatActivity;
 import com.example.shop.MainActivity;
 import com.example.shop.R;
-import com.google.android.gms.tasks.OnCompleteListener;
-import com.google.android.gms.tasks.Task;
-import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.firestore.CollectionReference;
 import com.google.firebase.firestore.FirebaseFirestore;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.UnsupportedEncodingException;
 
 /**
  * A simple {@link Fragment} subclass.
@@ -99,13 +104,18 @@ public class SignUpFragment extends Fragment {
     private FirebaseAuth firebaseAuth;
     private FirebaseFirestore firebaseFirestore;
 
+    SharedPreferences PreferenceStorage;
+    String URL = "http://10.0.2.2:8000/auth/signup";
+
+
     private String emailRegex = "[a-zA-Z0-9._-]+@[a-z]+.+[a-z]+";
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
-        // Inflate the layout for this fragment
-        View view =  inflater.inflate(R.layout.fragment_sign_up, container, false);
+        PreferenceStorage = this.getActivity().getSharedPreferences("com.example.shop", Context.MODE_PRIVATE);
+
+        View view = inflater.inflate(R.layout.fragment_sign_up, container, false);
         signIn = view.findViewById(R.id.or_sign_in_btn);
         frameLayout = getActivity().findViewById(R.id.registration_framelayout);
 
@@ -216,134 +226,178 @@ public class SignUpFragment extends Fragment {
     }
 
     private void validateInputs() {
-        if (!TextUtils.isEmpty(email.getText())){
-            if (!TextUtils.isEmpty(name.getText())){
-                if (!TextUtils.isEmpty(password.getText()) && password.length() >= 8){
-                    if (!TextUtils.isEmpty(confirmPassword.getText())){
+        if (!TextUtils.isEmpty(email.getText())) {
+            if (!TextUtils.isEmpty(name.getText())) {
+                if (!TextUtils.isEmpty(password.getText()) && password.length() >= 8) {
+                    if (!TextUtils.isEmpty(confirmPassword.getText())) {
                         signUpBtn.setEnabled(true);
-                        signUpBtn.setTextColor(Color.rgb(255,255,255));
-                    }
-                    else {
+                        signUpBtn.setTextColor(Color.rgb(255, 255, 255));
+                    } else {
                         signUpBtn.setEnabled(false);
-                        signUpBtn.setTextColor(Color.rgb(55,255,255));
+                        signUpBtn.setTextColor(Color.rgb(55, 255, 255));
                     }
-                }
-                else {
+                } else {
                     signUpBtn.setEnabled(false);
-                    signUpBtn.setTextColor(Color.rgb(55,255,255));
+                    signUpBtn.setTextColor(Color.rgb(55, 255, 255));
                 }
-            }
-            else {
+            } else {
                 signUpBtn.setEnabled(false);
-                signUpBtn.setTextColor(Color.rgb(55,255,255));
+                signUpBtn.setTextColor(Color.rgb(55, 255, 255));
             }
-        }
-        else {
+        } else {
             signUpBtn.setEnabled(false);
-            signUpBtn.setTextColor(Color.rgb(55,255,255));
+            signUpBtn.setTextColor(Color.rgb(55, 255, 255));
         }
     }
 
-    private void validateEmailAndPassword(){
-        if (email.getText().toString().matches(emailRegex)){
-            if (password.getText().toString().equals(confirmPassword.getText().toString())){
-                progressBar.setVisibility(View.VISIBLE);
-                firebaseAuth.createUserWithEmailAndPassword(email.getText().toString(),
-                        password.getText().toString())
-                        .addOnCompleteListener(new OnCompleteListener<AuthResult>() {
-                    @Override
-                    public void onComplete(@NonNull Task<AuthResult> task) {
-                        if (task.isSuccessful()){
+    private void request_to_signUp() {
+        try {
+            RequestQueue requestQueue = Volley.newRequestQueue(getActivity());
+            JSONObject jsonBody = new JSONObject();
+            jsonBody.put("username", email.getText().toString());
+            jsonBody.put("password", password.getText().toString());
 
-                            Map<String, Object> userdata = new HashMap<>();
-                            userdata.put("name", name.getText().toString());
-                            userdata.put("email", email.getText().toString());
-                            firebaseFirestore.collection("USERS").document(firebaseAuth.getUid())
-                                .set(userdata)
-                                .addOnCompleteListener(new OnCompleteListener<Void>() {
-                                @Override
-                                public void onComplete(@NonNull Task<Void> task) {
-                                    if (task.isSuccessful()){
-                                        CollectionReference userDataReference = firebaseFirestore.collection("USERS").document(FirebaseAuth.getInstance().getUid()).collection("USER_DATA");
+            JsonObjectRequest stringRequest = new JsonObjectRequest(Request.Method.POST, URL, jsonBody,
+                    new com.android.volley.Response.Listener<JSONObject>() {
+                        @Override
+                        public void onResponse(JSONObject response) {
+                            try {
+                                SharedPreferences.Editor editor = PreferenceStorage.edit();
+                                editor.putString("JWT_TOKEN", (String) response.get("access_token"));
+                                editor.apply();
+                                progressBar.setVisibility(View.INVISIBLE);
+                                startActivity(new Intent(getActivity(), ChatActivity.class));
+                                getActivity().finish();
 
-                                        Map<String, Object> wishListMap = new HashMap<>();
-                                        wishListMap.put("size_list", 0);
-
-                                        Map<String, Object> ratingMap = new HashMap<>();
-                                        ratingMap.put("size_list", 0);
-
-                                        Map<String, Object> cartMap = new HashMap<>();
-                                        cartMap.put("size_list", 0);
-
-                                        Map<String, Object> addressMap = new HashMap<>();
-                                        addressMap.put("size_list", 0);
-
-                                        List<String> documentNames = new ArrayList<>();
-                                        documentNames.add("WISHLIST");
-                                        documentNames.add("RATINGS");
-                                        documentNames.add("CART");
-                                        documentNames.add("ADDRESSES");
-
-                                        List<Map<String, Object>> documentFields = new ArrayList<>();
-                                        documentFields.add(wishListMap);
-                                        documentFields.add(ratingMap);
-                                        documentFields.add(cartMap);
-                                        documentFields.add(addressMap);
-
-                                        for(int i=0; i < documentNames.size(); i++){
-                                            int finalI = i;
-                                            userDataReference.document(documentNames.get(i)).set(documentFields.get(i)).addOnCompleteListener(new OnCompleteListener<Void>() {
-                                                @Override
-                                                public void onComplete(@NonNull Task<Void> task) {
-                                                    if (task.isSuccessful()){
-                                                        if(finalI == documentNames.size() - 1) {
-                                                            Intent mainIntent = new Intent(getContext(), MainActivity.class);
-                                                            startActivity(mainIntent);
-                                                            getActivity().finish();
-                                                        }
-                                                    }
-                                                    else{
-                                                        progressBar.setVisibility(View.INVISIBLE);
-
-                                                        signUpBtn.setEnabled(true);
-                                                        signUpBtn.setTextColor(Color.rgb(255,255,255));
-
-                                                        Toast.makeText(getActivity(), task.getException().getMessage(),
-                                                                Toast.LENGTH_LONG).show();
-                                                    }
-                                                }
-                                            });
-                                        }
-                                    }
-                                    else {
-                                        progressBar.setVisibility(View.INVISIBLE);
-
-                                        signUpBtn.setEnabled(true);
-                                        signUpBtn.setTextColor(Color.rgb(255,255,255));
-
-                                        Toast.makeText(getActivity(), task.getException().getMessage(),
-                                                Toast.LENGTH_LONG).show();
-                                    }
-                                }
-                            });
+                            } catch (JSONException e) {
+                                e.printStackTrace();
+                            }
                         }
-                        else {
-                            progressBar.setVisibility(View.INVISIBLE);
-
-                            signUpBtn.setEnabled(true);
-                            signUpBtn.setTextColor(Color.rgb(255,255,255));
-
-                            Toast.makeText(getActivity(), task.getException().getMessage(),
-                                           Toast.LENGTH_LONG).show();
+                    }, new Response.ErrorListener() {
+                @Override
+                public void onErrorResponse(VolleyError error) {
+                    progressBar.setVisibility(View.INVISIBLE);
+                    String body = null;
+                    String statusCode = String.valueOf(error.networkResponse.statusCode);
+                    if (error.networkResponse.data != null) {
+                        try {
+                            body = new String(error.networkResponse.data, "UTF-8");
+                        } catch (UnsupportedEncodingException e) {
+                            e.printStackTrace();
                         }
                     }
-                });
-            }
-            else {
+                    try {
+                        Toast.makeText(getContext(), new JSONObject(body).get("detail").toString(), Toast.LENGTH_LONG).show();
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+                }
+            });
+            requestQueue.add(stringRequest);
+        } catch (Exception e) {
+            Log.d("ws", e.toString());
+        }
+    }
+
+    private void validateEmailAndPassword() {
+        if (email.getText().toString().matches(emailRegex)) {
+            if (password.getText().toString().equals(confirmPassword.getText().toString())) {
+                progressBar.setVisibility(View.VISIBLE);
+                request_to_signUp();
+//                firebaseAuth.createUserWithEmailAndPassword(email.getText().toString(),
+//                        password.getText().toString())
+//                        .addOnCompleteListener(new OnCompleteListener<AuthResult>() {
+//                    @Override
+//                    public void onComplete(@NonNull Task<AuthResult> task) {
+//                        if (task.isSuccessful()){
+//
+//                            Map<String, Object> userdata = new HashMap<>();
+//                            userdata.put("name", name.getText().toString());
+//                            userdata.put("email", email.getText().toString());
+//                            firebaseFirestore.collection("USERS").document(firebaseAuth.getUid())
+//                                .set(userdata)
+//                                .addOnCompleteListener(new OnCompleteListener<Void>() {
+//                                @Override
+//                                public void onComplete(@NonNull Task<Void> task) {
+//                                    if (task.isSuccessful()){
+//                                        CollectionReference userDataReference = firebaseFirestore.collection("USERS").document(FirebaseAuth.getInstance().getUid()).collection("USER_DATA");
+//
+//                                        Map<String, Object> wishListMap = new HashMap<>();
+//                                        wishListMap.put("size_list", 0);
+//
+//                                        Map<String, Object> ratingMap = new HashMap<>();
+//                                        ratingMap.put("size_list", 0);
+//
+//                                        Map<String, Object> cartMap = new HashMap<>();
+//                                        cartMap.put("size_list", 0);
+//
+//                                        Map<String, Object> addressMap = new HashMap<>();
+//                                        addressMap.put("size_list", 0);
+//
+//                                        List<String> documentNames = new ArrayList<>();
+//                                        documentNames.add("WISHLIST");
+//                                        documentNames.add("RATINGS");
+//                                        documentNames.add("CART");
+//                                        documentNames.add("ADDRESSES");
+//
+//                                        List<Map<String, Object>> documentFields = new ArrayList<>();
+//                                        documentFields.add(wishListMap);
+//                                        documentFields.add(ratingMap);
+//                                        documentFields.add(cartMap);
+//                                        documentFields.add(addressMap);
+//
+//                                        for(int i=0; i < documentNames.size(); i++){
+//                                            int finalI = i;
+//                                            userDataReference.document(documentNames.get(i)).set(documentFields.get(i)).addOnCompleteListener(new OnCompleteListener<Void>() {
+//                                                @Override
+//                                                public void onComplete(@NonNull Task<Void> task) {
+//                                                    if (task.isSuccessful()){
+//                                                        if(finalI == documentNames.size() - 1) {
+//                                                            Intent mainIntent = new Intent(getContext(), MainActivity.class);
+//                                                            startActivity(mainIntent);
+//                                                            getActivity().finish();
+//                                                        }
+//                                                    }
+//                                                    else{
+//                                                        progressBar.setVisibility(View.INVISIBLE);
+//
+//                                                        signUpBtn.setEnabled(true);
+//                                                        signUpBtn.setTextColor(Color.rgb(255,255,255));
+//
+//                                                        Toast.makeText(getActivity(), task.getException().getMessage(),
+//                                                                Toast.LENGTH_LONG).show();
+//                                                    }
+//                                                }
+//                                            });
+//                                        }
+//                                    }
+//                                    else {
+//                                        progressBar.setVisibility(View.INVISIBLE);
+//
+//                                        signUpBtn.setEnabled(true);
+//                                        signUpBtn.setTextColor(Color.rgb(255,255,255));
+//
+//                                        Toast.makeText(getActivity(), task.getException().getMessage(),
+//                                                Toast.LENGTH_LONG).show();
+//                                    }
+//                                }
+//                            });
+//                        }
+//                        else {
+//                            progressBar.setVisibility(View.INVISIBLE);
+//
+//                            signUpBtn.setEnabled(true);
+//                            signUpBtn.setTextColor(Color.rgb(255,255,255));
+//
+//                            Toast.makeText(getActivity(), task.getException().getMessage(),
+//                                           Toast.LENGTH_LONG).show();
+//                        }
+//                    }
+//                });
+            } else {
                 confirmPassword.setError("Password doesn't matched");
             }
-        }
-        else {
+        } else {
             email.setError("Invalid email");
         }
     }

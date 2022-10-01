@@ -59,7 +59,7 @@ public class ChatActivity extends AppCompatActivity implements TextWatcher {
 
     private void initiateSocketConnection() {
         OkHttpClient client = new OkHttpClient();
-        Request request = new Request.Builder().url(SERVER_PATH+name).build();
+        Request request = new Request.Builder().url(SERVER_PATH + name).build();
         webSocket = client.newWebSocket(request, new SocketListener());
     }
 

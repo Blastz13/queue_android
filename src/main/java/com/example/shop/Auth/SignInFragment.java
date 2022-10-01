@@ -26,14 +26,11 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.android.volley.AuthFailureError;
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
 import com.android.volley.Response;
 import com.android.volley.VolleyError;
-import com.android.volley.VolleyLog;
 import com.android.volley.toolbox.JsonObjectRequest;
-import com.android.volley.toolbox.StringRequest;
 import com.android.volley.toolbox.Volley;
 import com.example.shop.ChatActivity;
 import com.example.shop.MainActivity;
@@ -109,15 +106,15 @@ public class SignInFragment extends Fragment {
     private String emailRegex = "[a-zA-Z0-9._-]+@[a-z]+.+[a-z]+";
 
     SharedPreferences PreferenceStorage;
+    String URL = "http://10.0.2.2:8000/auth/login";
 
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
-        // Inflate the layout for this fragment
         PreferenceStorage = this.getActivity().getSharedPreferences("com.example.shop", Context.MODE_PRIVATE);
 
-        View view  = inflater.inflate(R.layout.fragment_sign_in, container, false);
+        View view = inflater.inflate(R.layout.fragment_sign_in, container, false);
         signUp = view.findViewById(R.id.or_sign_up_btn);
         frameLayout = getActivity().findViewById(R.id.registration_framelayout);
 
@@ -210,125 +207,78 @@ public class SignInFragment extends Fragment {
     }
 
     private void validateInputs() {
-        if (!TextUtils.isEmpty(email.getText())){
-            if (!TextUtils.isEmpty(password.getText())  && password.length() >= 8){
+        if (!TextUtils.isEmpty(email.getText())) {
+            if (!TextUtils.isEmpty(password.getText()) && password.length() >= 8) {
                 signInBtn.setEnabled(true);
-                signInBtn.setTextColor(Color.rgb(255,255,255));
-            }
-            else {
+                signInBtn.setTextColor(Color.rgb(255, 255, 255));
+            } else {
                 signInBtn.setEnabled(false);
-                signInBtn.setTextColor(Color.rgb(55,255,255));
+                signInBtn.setTextColor(Color.rgb(55, 255, 255));
             }
-        }
-        else {
+        } else {
             signInBtn.setEnabled(false);
-            signInBtn.setTextColor(Color.rgb(55,255,255));
+            signInBtn.setTextColor(Color.rgb(55, 255, 255));
         }
     }
+
     private void validateEmailAndPassword() throws IOException, JSONException {
         if (email.getText().toString().matches(emailRegex) &&
-            !TextUtils.isEmpty(password.getText())  && password.length() >= 8){
+                !TextUtils.isEmpty(password.getText()) && password.length() >= 8) {
 
             progressBar.setVisibility(View.VISIBLE);
-
-            Log.d("ws", "ZERO");
-
-            sendPOST();
-
-//            Thread thread = new Thread(new Runnable() {
-//
-//                @Override
-//                public void run() {
-//                    try  {
-//                        sendPOST();
-//                    } catch (Exception e) {
-//                        e.printStackTrace();
-//                    }
-//                }
-//            });
-//            thread.start();
-//            SharedPreferences.Editor editor = PreferenceStorage.edit();
-//            editor.putString("JWT_TOKEN", "21312331312");
-//            editor.apply();
-
-//            startActivity(new Intent(getActivity(), ChatActivity.class));
-//            getActivity().finish();
-//
-//            progressBar.setVisibility(View.INVISIBLE);
-
-//            firebaseAuth.signInWithEmailAndPassword(email.getText().toString(),
-//                                                    password.getText().toString())
-//                    .addOnCompleteListener(new OnCompleteListener<AuthResult>() {
-//                        @Override
-//                        public void onComplete(@NonNull Task<AuthResult> task) {
-//                            if (task.isSuccessful()){
-//                                startActivity(new Intent(getActivity(), MainActivity.class));
-//                                getActivity().finish();
-//                            }
-//                            else {
-//                                progressBar.setVisibility(View.INVISIBLE);
-//
-//                                signInBtn.setEnabled(true);
-//                                signInBtn.setTextColor(Color.rgb(255,255,255));
-//
-//                                Toast.makeText(getActivity(), task.getException().getMessage(),
-//                                                Toast.LENGTH_LONG).show();
-//                            }
-//                        }
-//                    });
-        }
-        else {
+            request_to_login();
+        } else {
             Toast.makeText(getActivity(), "Incorrect email or password",
-                           Toast.LENGTH_LONG).show();
+                    Toast.LENGTH_LONG).show();
         }
     }
 
-    private void sendPOST() throws IOException, JSONException {
+    private void request_to_login() {
         try {
-            Log.d("ws", "Request");
             RequestQueue requestQueue = Volley.newRequestQueue(getActivity());
-            String URL = "http://10.0.2.2:8000/auth/login";
             JSONObject jsonBody = new JSONObject();
-            jsonBody.put("username", "string");
-            jsonBody.put("password", "string");
-            final String requestBody = jsonBody.toString();
+            jsonBody.put("username", email.getText().toString());
+            jsonBody.put("password", password.getText().toString());
 
-            JsonObjectRequest stringRequest = new JsonObjectRequest(Request.Method.POST, URL, jsonBody,  new com.android.volley.Response.Listener<JSONObject>() {
-                @Override
-                public void onResponse(JSONObject response) {
-                    try {
-                        SharedPreferences.Editor editor = PreferenceStorage.edit();
-                        editor.putString("JWT_TOKEN", (String) response.get("access_token"));
-                        editor.apply();
-                        Log.d("ws", "onResponse: " + response.get("access_token"));
-                        Log.d("ws", "onResponse: GO ACOKOCKAC");
-                        startActivity(new Intent(getActivity(), ChatActivity.class));
-                        getActivity().finish();
+            JsonObjectRequest stringRequest = new JsonObjectRequest(Request.Method.POST, URL, jsonBody,
+                    new com.android.volley.Response.Listener<JSONObject>() {
+                        @Override
+                        public void onResponse(JSONObject response) {
+                            try {
+                                SharedPreferences.Editor editor = PreferenceStorage.edit();
+                                editor.putString("JWT_TOKEN", (String) response.get("access_token"));
+                                editor.apply();
+                                progressBar.setVisibility(View.INVISIBLE);
+                                startActivity(new Intent(getActivity(), ChatActivity.class));
+                                getActivity().finish();
 
-                        progressBar.setVisibility(View.INVISIBLE);
-                    } catch (JSONException e) {
-                        e.printStackTrace();
-                    }
-                }
-            }, new Response.ErrorListener() {
+                            } catch (JSONException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    }, new Response.ErrorListener() {
                 @Override
                 public void onErrorResponse(VolleyError error) {
-                    Log.e("ws", error.toString());
+                    progressBar.setVisibility(View.INVISIBLE);
                     String body = null;
                     String statusCode = String.valueOf(error.networkResponse.statusCode);
-                    if(error.networkResponse.data!=null) {
+                    if (error.networkResponse.data != null) {
                         try {
-                            body = new String(error.networkResponse.data,"UTF-8");
+                            body = new String(error.networkResponse.data, "UTF-8");
                         } catch (UnsupportedEncodingException e) {
                             e.printStackTrace();
                         }
                     }
-                    Log.d("ws", body);
+                    try {
+                        Toast.makeText(getContext(), new JSONObject(body).get("detail").toString(), Toast.LENGTH_LONG).show();
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
                 }
             });
             requestQueue.add(stringRequest);
         } catch (Exception e) {
             Log.d("ws", e.toString());
         }
-        }
     }
+}

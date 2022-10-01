@@ -197,7 +197,7 @@ public class MessageAdapter extends RecyclerView.Adapter {
         return messages.size();
     }
 
-    public void addItem (JSONObject jsonObject) {
+    public void addItem(JSONObject jsonObject) {
         messages.add(jsonObject);
         notifyDataSetChanged();
     }
