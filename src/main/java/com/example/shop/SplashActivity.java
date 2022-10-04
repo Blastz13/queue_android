@@ -23,7 +23,7 @@ public class SplashActivity extends AppCompatActivity {
     @Override
     protected void onStart() {
         if(PreferenceStorage.contains("JWT_TOKEN")) {
-            startActivity(new Intent(SplashActivity.this, ChatActivity.class));
+            startActivity(new Intent(SplashActivity.this, ListQueueRoomActivity.class));
         }
         else {
             startActivity(new Intent(SplashActivity.this, RegistrationActivity.class));

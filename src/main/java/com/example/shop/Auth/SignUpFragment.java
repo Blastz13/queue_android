@@ -33,6 +33,7 @@ import com.android.volley.VolleyError;
 import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.Volley;
 import com.example.shop.ChatActivity;
+import com.example.shop.ListQueueRoomActivity;
 import com.example.shop.MainActivity;
 import com.example.shop.R;
 import com.google.firebase.auth.FirebaseAuth;
@@ -266,7 +267,7 @@ public class SignUpFragment extends Fragment {
                                 editor.putString("JWT_TOKEN", (String) response.get("access_token"));
                                 editor.apply();
                                 progressBar.setVisibility(View.INVISIBLE);
-                                startActivity(new Intent(getActivity(), ChatActivity.class));
+                                startActivity(new Intent(getActivity(), ListQueueRoomActivity.class));
                                 getActivity().finish();
 
                             } catch (JSONException e) {
