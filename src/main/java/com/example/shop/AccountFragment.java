@@ -1,12 +1,15 @@
 package com.example.shop;
 
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 
 import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 import androidx.navigation.Navigation;
 
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -14,7 +17,13 @@ import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import com.android.volley.RequestQueue;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.JsonArrayRequest;
+import com.android.volley.toolbox.JsonObjectRequest;
+import com.android.volley.toolbox.Volley;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.RequestOptions;
 import com.example.shop.Addresses.AddressesModel;
@@ -28,8 +37,15 @@ import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.QuerySnapshot;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.UnsupportedEncodingException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 
 public class AccountFragment extends Fragment {
@@ -39,6 +55,8 @@ public class AccountFragment extends Fragment {
     public static final int MANAGE_ADDRESS = 1;
     private Button viewAllAddressesButton;
     private Button signOutButton;
+    private static String URL_PROFILE = "http://10.0.2.2:8000/auth/profile/";
+
     private TextView name;
     private TextView email;
     private TextView addressName;
@@ -48,6 +66,9 @@ public class AccountFragment extends Fragment {
     private List<OrderItemModel> orderItemModelList = new ArrayList<>();
     private FirebaseFirestore firebaseFirestore = FirebaseFirestore.getInstance();
     private LinearLayout recentOrders;
+    SharedPreferences PreferenceStorage;
+    String JWT_TOKEN;
+    Integer currentUserId;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
@@ -56,6 +77,8 @@ public class AccountFragment extends Fragment {
         View view = inflater.inflate(R.layout.fragment_account, container, false);
 
 //        NavHostFragment.findNavController(this).navigate(R.id.orderFragment);
+        PreferenceStorage = getActivity().getSharedPreferences("com.example.shop", Context.MODE_PRIVATE);
+        JWT_TOKEN = PreferenceStorage.getString("JWT_TOKEN", "");
 
         TextView recent_orders = view.findViewById(R.id.recent_orders);
         viewAllAddressesButton = view.findViewById(R.id.viewall_btn_address);
@@ -68,149 +91,66 @@ public class AccountFragment extends Fragment {
         index = view.findViewById(R.id.index_address);
         orderTitle = view.findViewById(R.id.recent_orders);
 
-        loadAddress();
-        loadUserInfo();
-        loadOrders();
-
-
         signOutButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                FirebaseAuth.getInstance().signOut();
+//                FirebaseAuth.getInstance().signOut();
+                PreferenceStorage.edit().clear().commit();
                 Intent registerIntent = new Intent(getContext(), RegistrationActivity.class);
                 getContext().startActivity(registerIntent);
             }
         });
-
-        viewAllAddressesButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Intent addressesIntent = new Intent(getContext(), MyAddressesActivity.class);
-                addressesIntent.putExtra("MODE", MANAGE_ADDRESS);
-                getContext().startActivity(addressesIntent);
-            }
-        });
-
-        recent_orders.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                Navigation.findNavController(view).navigate(R.id.orderFragment);
-            }
-        });
+        request_get_current_user_id();
 
         return view;
     }
 
-    private void loadUserInfo(){
-        firebaseFirestore.collection("USERS").document(FirebaseAuth.getInstance().getUid()).get().addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
-            @Override
-            public void onComplete(@NonNull Task<DocumentSnapshot> task) {
-                if(task.isSuccessful()){
-                    name.setText(task.getResult().get("name").toString());
-                    email.setText(task.getResult().get("email").toString());
-                }
-            }
-        });
-    }
+    private void request_get_current_user_id() {
+        RequestQueue requestQueue = Volley.newRequestQueue(getActivity());
 
-    private void loadAddress(){
-        addressesModelList.clear();
-        firebaseFirestore.collection("USERS").document(FirebaseAuth.getInstance().getUid())
-                .collection("USER_DATA").document("ADDRESSES")
-                .get().addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
-            @Override
-            public void onComplete(@NonNull Task<DocumentSnapshot> task) {
-                if(task.isSuccessful()){
-                        for(long i=1; i < (long) task.getResult().get("size_list") + 1; i++){
-                            addressesModelList.add(new AddressesModel(task.getResult().getBoolean("selected_"+i),
-                                    task.getResult().getString("city_"+i),
-                                    task.getResult().getString("street_"+i),
-                                    task.getResult().getString("house_"+i),
-                                    task.getResult().getString("index_"+i),
-                                    task.getResult().getString("flat_"+i),
-                                    task.getResult().getString("note_"+i),
-                                    task.getResult().getString("name_"+i),
-                                    task.getResult().getString("phone_"+i)));//////
-                            if((boolean)task.getResult().get("selected_"+i)){
-                                selectedAddress = (int) (i - 1);
-                            }
-                        }
-                        if(!task.getResult().get("size_list").toString().equals("0")){
-                            addressName.setText(addressesModelList.get(selectedAddress).getName());
-                            address.setText(addressesModelList.get(selectedAddress).getAddress());
-                            index.setText(addressesModelList.get(selectedAddress).getIndex());
-                        }
-                        else {
-                            addressName.setText("-");
-                            address.setText("-");
-                            index.setText("-");
+        JsonObjectRequest stringRequest = new JsonObjectRequest(com.android.volley.Request.Method.GET, URL_PROFILE, null,
+                new com.android.volley.Response.Listener<JSONObject>() {
+                    @Override
+                    public void onResponse(JSONObject response) {
+                        try {
+                            SharedPreferences.Editor editor = PreferenceStorage.edit();
+                            currentUserId = response.getInt("id");
+                            name.setText(response.getString("username"));
+                            editor.putString("USER_ID", String.valueOf(response.get("id")));
+                            editor.apply();
+
+                        } catch (JSONException e) {
+                            e.printStackTrace();
                         }
                     }
-                }
-
-        });
-    }
-
-    private void loadOrders(){
-        orderItemModelList.clear();
-        final int[] i = {0};
-        firebaseFirestore.collection("USERS").document(FirebaseAuth.getInstance().getUid())
-                .collection("USER_ORDERS").get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
+                }, new com.android.volley.Response.ErrorListener() {
             @Override
-            public void onComplete(@NonNull Task<QuerySnapshot> task) {
-                if(task.isSuccessful()){
-                    for(DocumentSnapshot documentSnapshot: task.getResult()){
-                        if(documentSnapshot.get("user_id").toString().equals(FirebaseAuth.getInstance().getUid()) ) {
-                            firebaseFirestore.collection("USERS").document(FirebaseAuth.getInstance()
-                                    .getUid()).collection("USER_ORDERS")
-                                    .document(documentSnapshot.get("order_id").toString())
-                                    .collection("ORDER_ITEMS").get().addOnCompleteListener(new OnCompleteListener<QuerySnapshot>() {
-                                @Override
-                                public void onComplete(@NonNull Task<QuerySnapshot> task) {
-                                    if(task.isSuccessful()){
-                                        for(DocumentSnapshot documentSnapshot1: task.getResult()){
-                                            firebaseFirestore.collection("PRODUCTS")
-                                                    .document(documentSnapshot1.get("product_id").toString())
-                                                    .get().addOnCompleteListener(new OnCompleteListener<DocumentSnapshot>() {
-                                                @Override
-                                                public void onComplete(@NonNull Task<DocumentSnapshot> task) {
-                                                    if(task.isSuccessful()){
-                                                        orderTitle.setText("Последние заказы");
-
-//                                                        for(OrderItemModel orderItemModel: Order.orderItemModelList){
-                                                            if (i[0] < 4) {
-                                                                recentOrders.getChildAt(i[0]).setVisibility(View.VISIBLE);
-                                                                Glide.with(getContext()).load(task.getResult().get("product_image_1").toString()).apply(new RequestOptions().placeholder(R.mipmap.app_ico)).into((ImageView) recentOrders.getChildAt(i[0]));
-                                                                i[0]++;
-                                                            }
-//                                                        }
-                                                        if(i[0] == 0){
-                                                            orderTitle.setText("No recent orders");
-
-                                                        }
-
-                                                    }
-                                                    else{
-                                                        ;
-                                                    }
-                                                }
-                                            });
-                                        }
-                                    }
-                                    else{
-                                        ;
-                                    }
-                                }
-                            });
-                        }
+            public void onErrorResponse(VolleyError error) {
+                String body = null;
+//                String statusCode = String.valueOf(error.networkResponse.statusCode);
+                if (error.networkResponse.data != null) {
+                    try {
+                        body = new String(error.networkResponse.data, "UTF-8");
+                    } catch (UnsupportedEncodingException e) {
+                        e.printStackTrace();
                     }
                 }
-                else {
-
-                }
+                //                    Toast.makeText(ChatActivity.this, new JSONObject(body).get("detail").toString(), Toast.LENGTH_LONG).show();
             }
-        });
+        }) {
+
+            /** Passing some request headers* */
+            @Override
+            public Map getHeaders() {
+                HashMap headers = new HashMap();
+                headers.put("Authorization", "Bearer " + JWT_TOKEN);
+                return headers;
+            }
+        };
+
+        requestQueue.add(stringRequest);
     }
+
 
 
 }

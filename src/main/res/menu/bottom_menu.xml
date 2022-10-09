@@ -5,14 +5,7 @@
         android:title="Главная"
         android:icon="@drawable/ic_home"
         android:id="@+id/homeFragment"/>
-    <item
-        android:title="Корзина"
-        android:icon="@drawable/ic_cart"
-        android:id="@+id/cartFragment"/>
-    <item
-        android:title="Избранное"
-        android:icon="@drawable/ic_favorite"
-        android:id="@id/wishFragment"/>
+
     <item
         android:title="Аккаунт"
         android:icon="@drawable/ic_person"

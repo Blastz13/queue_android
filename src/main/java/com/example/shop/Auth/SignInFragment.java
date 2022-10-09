@@ -250,7 +250,7 @@ public class SignInFragment extends Fragment {
                                 editor.putString("JWT_TOKEN", (String) response.get("access_token"));
                                 editor.apply();
                                 progressBar.setVisibility(View.INVISIBLE);
-                                startActivity(new Intent(getActivity(), ListQueueRoomActivity.class));
+                                startActivity(new Intent(getActivity(), MainActivity.class));
                                 getActivity().finish();
 
                             } catch (JSONException e) {

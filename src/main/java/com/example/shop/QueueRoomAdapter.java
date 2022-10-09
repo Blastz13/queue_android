@@ -56,7 +56,7 @@ public class QueueRoomAdapter extends RecyclerView.Adapter<QueueRoomAdapter.Queu
         public QueueRoomViewHolder(@NonNull View itemView) {
             super(itemView);
 
-            queueRoomTitle = itemView.findViewById(R.id.queueRoomTitle);
+            queueRoomTitle = itemView.findViewById(R.id.queueTicketRoomTitle);
             openQueueRoomBtn = itemView.findViewById(R.id.openQueueRoomBtn);
         }
     }

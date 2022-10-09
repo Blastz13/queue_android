@@ -11,11 +11,14 @@ import android.text.TextWatcher;
 import android.util.Base64;
 import android.util.Log;
 import android.view.View;
+import android.widget.Button;
 import android.widget.EditText;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -34,7 +37,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
+import java.security.spec.ECField;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import okhttp3.OkHttpClient;
@@ -49,6 +55,11 @@ public class ChatActivity extends AppCompatActivity implements TextWatcher {
     private static String URL_ROOM_WS = "ws://10.0.2.2:8000/chat/ws/";
     private static String URL_LOAD_MESSAGES = "http://10.0.2.2:8000/chat/";
     private static String URL_PROFILE = "http://10.0.2.2:8000/auth/profile/";
+    private static String URL_LOAD_NEXT_QUEUE_TICKET = "http://10.0.2.2:8000/queue/";
+    private static String URL = "http://10.0.2.2:8000/";
+    private static String URL_ADD_TO_QUEUE_TICKET;
+    private static String URL_LOAD_NEXT_QUEUE_TICKET_ROOM;
+    private static String URL_CURRENT_TICKET;
     private int IMAGE_REQUEST_ID = 1;
 
     Integer idQueueRoom;
@@ -56,24 +67,44 @@ public class ChatActivity extends AppCompatActivity implements TextWatcher {
     private String JWT_TOKEN;
     private WebSocket webSocket;
     private EditText messageEdit;
-    private View sendBtn, pickImgBtn;
+    private View sendBtn;
     private RecyclerView recyclerView;
     private MessageAdapter messageAdapter;
     SharedPreferences PreferenceStorage;
+    private TextView currentTicketEmail;
+    private TextView nextTicketEmail;
+    private TextView moreQueueTicketBtn;
+    private TextView hiddenQueueTicketBtn;
+    private ConstraintLayout moreQueueTicket;
+    Button addToQueueBtn;
+    JSONObject currentQueueTicket;
+    RecyclerView queueTicketRoomRecycler;
+    QueueTicketRoomAdapter queueTicketRoomAdapter;
+    List<QueueTicketRoomModel> queueTicketList;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_chat);
+        queueTicketRoomRecycler = findViewById(R.id.queueTicketRoomRecycler);
+        RecyclerView.LayoutManager layoutManager = new LinearLayoutManager(this, RecyclerView.VERTICAL, false);
+        queueTicketRoomRecycler.setLayoutManager(layoutManager);
+        queueTicketList = new ArrayList<>();
+//        queueTicketList.add(new QueueTicketRoomModel(1, "wait", "testttt"));
+//        queueTicketList.add(new QueueTicketRoomModel(1, "wait", "test2"));
+        queueTicketRoomAdapter = new QueueTicketRoomAdapter(this, queueTicketList);
+        queueTicketRoomRecycler.setAdapter(queueTicketRoomAdapter);
+
         idQueueRoom = getIntent().getIntExtra("idQueueRoom", 0);
         PreferenceStorage = getSharedPreferences("com.example.shop", Context.MODE_PRIVATE);
         JWT_TOKEN = PreferenceStorage.getString("JWT_TOKEN", "");
         currentUserId = Integer.valueOf(PreferenceStorage.getString("USER_ID", String.valueOf(0)));
         URL_ROOM_WS = URL_WS + idQueueRoom + "/";
-
+        URL_CURRENT_TICKET = "http://10.0.2.2:8000/queue/" + idQueueRoom + "/current";
+        URL_ADD_TO_QUEUE_TICKET = "http://10.0.2.2:8000/" + idQueueRoom + "/";
+        URL_LOAD_NEXT_QUEUE_TICKET_ROOM = URL_LOAD_NEXT_QUEUE_TICKET + idQueueRoom;
         messageEdit = findViewById(R.id.messageEdit);
         sendBtn = findViewById(R.id.sendBtn);
-        pickImgBtn = findViewById(R.id.pickImgBtn);
 
         recyclerView = findViewById(R.id.recyclerView);
 
@@ -81,9 +112,42 @@ public class ChatActivity extends AppCompatActivity implements TextWatcher {
         recyclerView.setAdapter(messageAdapter);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
 
+        currentTicketEmail = findViewById(R.id.currentTicketEmail);
+        nextTicketEmail = findViewById(R.id.nextTicketEmail);
+        moreQueueTicketBtn = findViewById(R.id.moreQueueTicketBtn);
+        moreQueueTicket = findViewById(R.id.moreQueueTicket);
+        hiddenQueueTicketBtn = findViewById(R.id.hiddenQueueTicketBtn);
+        addToQueueBtn = findViewById(R.id.AddToQueueBtn);
+
+        addToQueueBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                request_add_to_queue();
+                addToQueueBtn.setVisibility(View.INVISIBLE);
+            }
+        });
+
+        moreQueueTicketBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                moreQueueTicket.setVisibility(View.VISIBLE);
+                moreQueueTicketBtn.setVisibility(View.GONE);
+                recyclerView.smoothScrollToPosition(messageAdapter.getItemCount() - 1);
+            }
+        });
+
+        hiddenQueueTicketBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                moreQueueTicket.setVisibility(View.GONE);
+                moreQueueTicketBtn.setVisibility(View.VISIBLE);
+                recyclerView.smoothScrollToPosition(messageAdapter.getItemCount() - 1);
+
+            }
+        });
 
         messageEdit.addTextChangedListener(this);
-
+        request_get_current_ticket();
         sendBtn.setOnClickListener(v -> {
 
             JSONObject jsonObject = new JSONObject();
@@ -107,8 +171,10 @@ public class ChatActivity extends AppCompatActivity implements TextWatcher {
         });
 
         request_get_current_user_id();
+        request_get_next_queue_ticket();
         initiateSocketConnection();
         request_get_list_messages_room();
+
     }
 
     private void initiateSocketConnection() {
@@ -136,7 +202,7 @@ public class ChatActivity extends AppCompatActivity implements TextWatcher {
             resetMessageEdit();
         } else {
             sendBtn.setVisibility(View.VISIBLE);
-            pickImgBtn.setVisibility(View.INVISIBLE);
+//            pickImgBtn.setVisibility(View.INVISIBLE);
         }
 
     }
@@ -146,7 +212,6 @@ public class ChatActivity extends AppCompatActivity implements TextWatcher {
 
         messageEdit.setText("");
         sendBtn.setVisibility(View.INVISIBLE);
-        pickImgBtn.setVisibility(View.VISIBLE);
 
         messageEdit.addTextChangedListener(this);
 
@@ -163,7 +228,6 @@ public class ChatActivity extends AppCompatActivity implements TextWatcher {
 //                Toast.makeText(ChatActivity.this,
 //                        "Socket Connection Successful!",
 //                        Toast.LENGTH_SHORT).show();
-                initializeView();
             });
 
         }
@@ -175,11 +239,38 @@ public class ChatActivity extends AppCompatActivity implements TextWatcher {
             runOnUiThread(() -> {
                 try {
                     JSONObject jsonObject = new JSONObject(text);
-                    jsonObject.put("is_own_message", false);
+                    if (jsonObject.getString("action").equals("updateCurrentQueue")) {
+                        if (!jsonObject.isNull("data")) {
+                            currentTicketEmail.setText(jsonObject.getJSONObject("data").getJSONObject("user").getString("username"));
+                        } else {
+                            currentTicketEmail.setText("Is empty");
+                        }
+                    } else if (jsonObject.getString("action").equals("updateListQueue")) {
+                        if (jsonObject.getJSONArray("data").length() != 0) {
+                            nextTicketEmail.setText(jsonObject.getJSONArray("data").getJSONObject(0).getJSONObject("user").getString("username"));
+                        } else {
+                            nextTicketEmail.setText("Is empty");
+                        }
 
-                    if (jsonObject.getInt("user_id") != currentUserId) {
-                        messageAdapter.addItem(jsonObject);
-                        recyclerView.smoothScrollToPosition(messageAdapter.getItemCount() - 1);
+                        JSONArray data = jsonObject.getJSONArray("data");
+                        queueTicketList = new ArrayList<>();
+
+                        for (int i = 1; i < data.length(); i++) {
+                            queueTicketList.add(new QueueTicketRoomModel(data.getJSONObject(i).getInt("id"),
+                                    data.getJSONObject(i).getString("status"),
+                                    data.getJSONObject(i).getJSONObject("user").getString("username")));
+
+                        }
+                        queueTicketRoomAdapter = new QueueTicketRoomAdapter(ChatActivity.this, queueTicketList);
+                        queueTicketRoomRecycler.setAdapter(queueTicketRoomAdapter);
+                        queueTicketRoomAdapter.notifyDataSetChanged();
+                    } else {
+                        jsonObject.put("is_own_message", false);
+
+                        if (jsonObject.getInt("user_id") != currentUserId) {
+                            messageAdapter.addItem(jsonObject);
+                            recyclerView.smoothScrollToPosition(messageAdapter.getItemCount() - 1);
+                        }
                     }
                 } catch (JSONException e) {
                     e.printStackTrace();
@@ -190,53 +281,6 @@ public class ChatActivity extends AppCompatActivity implements TextWatcher {
         }
     }
 
-    private void initializeView() {
-
-//        messageEdit = findViewById(R.id.messageEdit);
-//        sendBtn = findViewById(R.id.sendBtn);
-//        pickImgBtn = findViewById(R.id.pickImgBtn);
-//
-//        recyclerView = findViewById(R.id.recyclerView);
-//
-//        messageAdapter = new MessageAdapter(getLayoutInflater());
-//        recyclerView.setAdapter(messageAdapter);
-//        recyclerView.setLayoutManager(new LinearLayoutManager(this));
-//
-//
-//        messageEdit.addTextChangedListener(this);
-//        sendBtn.setOnClickListener(v -> {
-//
-//            JSONObject jsonObject = new JSONObject();
-//            try {
-//                jsonObject.put("username", "client_android");
-//                jsonObject.put("message", messageEdit.getText().toString());
-//
-//                webSocket.send(messageEdit.getText().toString());
-//
-//                jsonObject.put("is_own_message", true);
-//                messageAdapter.addItem(jsonObject);
-//
-//                recyclerView.smoothScrollToPosition(messageAdapter.getItemCount() - 1);
-//
-//                resetMessageEdit();
-//
-//            } catch (JSONException e) {
-//                e.printStackTrace();
-//            }
-//
-//        });
-
-        pickImgBtn.setOnClickListener(v -> {
-
-            Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-            intent.setType("image/*");
-
-            startActivityForResult(Intent.createChooser(intent, "Pick image"),
-                    IMAGE_REQUEST_ID);
-
-        });
-
-    }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
@@ -334,7 +378,200 @@ public class ChatActivity extends AppCompatActivity implements TextWatcher {
         requestQueue.add(stringRequest);
     }
 
+    private void request_add_to_queue() {
+        RequestQueue requestQueue = Volley.newRequestQueue(this);
+
+        JsonObjectRequest stringRequest = new JsonObjectRequest(com.android.volley.Request.Method.POST, URL_ADD_TO_QUEUE_TICKET, null,
+                new com.android.volley.Response.Listener<JSONObject>() {
+                    @Override
+                    public void onResponse(JSONObject response) {
+                        ;
+                    }
+                }, new com.android.volley.Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+                String body = null;
+                String statusCode = String.valueOf(error.networkResponse.statusCode);
+                if (error.networkResponse.data != null) {
+                    try {
+                        body = new String(error.networkResponse.data, "UTF-8");
+                    } catch (UnsupportedEncodingException e) {
+                        e.printStackTrace();
+                    }
+                }
+                try {
+                    Toast.makeText(ChatActivity.this, new JSONObject(body).get("detail").toString(), Toast.LENGTH_LONG).show();
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+            }
+        }) {
+
+            /** Passing some request headers* */
+            @Override
+            public Map getHeaders() {
+                HashMap headers = new HashMap();
+                headers.put("Authorization", "Bearer " + JWT_TOKEN);
+                return headers;
+            }
+        };
+
+        requestQueue.add(stringRequest);
+    }
+
     public void request_get_list_messages_room() {
+        JsonArrayRequest jsonObjReq = new JsonArrayRequest(com.android.volley.Request.Method.GET,
+                URL_LOAD_MESSAGES + idQueueRoom, null,
+                new com.android.volley.Response.Listener<JSONArray>() {
+                    @Override
+                    public void onResponse(JSONArray response) {
+                        JSONObject jsonObject = new JSONObject();
+                        for (int i = response.length() - 1; i >= 0; i--) {
+                            try {
+                                jsonObject = new JSONObject();
+                                jsonObject.put("username", response.getJSONObject(i).getString("username"));
+                                jsonObject.put("message", response.getJSONObject(i).getString("message"));
+                                if (response.getJSONObject(i).getInt("user_id") == currentUserId) {
+                                    jsonObject.put("is_own_message", true);
+                                } else {
+                                    jsonObject.put("is_own_message", false);
+
+                                }
+                                if (jsonObject != null) {
+                                    messageAdapter.addItem(jsonObject);
+                                }
+                                recyclerView.smoothScrollToPosition(messageAdapter.getItemCount() - 1);
+                            } catch (JSONException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    }
+                },
+                new com.android.volley.Response.ErrorListener() {
+                    @Override
+                    public void onErrorResponse(VolleyError error) {
+                        try {
+                            Toast.makeText(ChatActivity.this, new JSONObject(error.toString()).get("detail").toString(), Toast.LENGTH_LONG).show();
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+        );
+        RequestQueue requestQueue = Volley.newRequestQueue(this);
+        requestQueue.add(jsonObjReq);
+    }
+
+    private void request_get_current_ticket() {
+        RequestQueue requestQueue = Volley.newRequestQueue(this);
+
+        JsonObjectRequest stringRequest = new JsonObjectRequest(com.android.volley.Request.Method.GET, URL_CURRENT_TICKET, null,
+                new com.android.volley.Response.Listener<JSONObject>() {
+                    @Override
+                    public void onResponse(JSONObject response) {
+                        try {
+                            currentTicketEmail.setText(response.getJSONObject("user").getString("username"));
+                            currentQueueTicket = response.getJSONObject("user");
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }, new com.android.volley.Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+                try {
+                    String body = null;
+                    String statusCode = String.valueOf(error.networkResponse.statusCode);
+                    if (error.networkResponse.data != null) {
+                        try {
+                            body = new String(error.networkResponse.data, "UTF-8");
+                        } catch (UnsupportedEncodingException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                    try {
+                        Toast.makeText(ChatActivity.this, new JSONObject(body).get("detail").toString(), Toast.LENGTH_LONG).show();
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+                } catch (Exception e) {
+                    currentTicketEmail.setText("Is empty");
+                }
+            }
+        }) {
+
+            /** Passing some request headers* */
+            @Override
+            public Map getHeaders() {
+                HashMap headers = new HashMap();
+                headers.put("Authorization", "Bearer " + JWT_TOKEN);
+                return headers;
+            }
+        };
+
+        requestQueue.add(stringRequest);
+    }
+
+
+    private void request_get_next_queue_ticket() {
+        RequestQueue requestQueue = Volley.newRequestQueue(this);
+
+        JsonArrayRequest stringRequest = new JsonArrayRequest(com.android.volley.Request.Method.GET, URL_LOAD_NEXT_QUEUE_TICKET_ROOM, null,
+                new com.android.volley.Response.Listener<JSONArray>() {
+                    @Override
+                    public void onResponse(JSONArray response) {
+                        try {
+                            nextTicketEmail.setText(response.getJSONObject(0).getJSONObject("user").getString("username"));
+                        } catch (Exception e) {
+                            nextTicketEmail.setText("Is empty");
+                        }
+
+                        for (int i = 1; i < response.length(); i++) {
+                            try {
+                                JSONObject obj = response.getJSONObject(i);
+                                queueTicketList.add(new QueueTicketRoomModel(obj.getInt("id"),
+                                        obj.getString("status"),
+                                        obj.getJSONObject("user").getString("username")));
+                            } catch (JSONException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                        queueTicketRoomAdapter.notifyDataSetChanged();
+                    }
+
+                }, new com.android.volley.Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+                String body = null;
+                String statusCode = String.valueOf(error.networkResponse.statusCode);
+                if (error.networkResponse.data != null) {
+                    try {
+                        body = new String(error.networkResponse.data, "UTF-8");
+                    } catch (UnsupportedEncodingException e) {
+                        e.printStackTrace();
+                    }
+                }
+                try {
+                    Toast.makeText(ChatActivity.this, new JSONObject(body).get("detail").toString(), Toast.LENGTH_LONG).show();
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+            }
+        }) {
+
+            /** Passing some request headers* */
+            @Override
+            public Map getHeaders() {
+                HashMap headers = new HashMap();
+                headers.put("Authorization", "Bearer " + JWT_TOKEN);
+                return headers;
+            }
+        };
+
+        requestQueue.add(stringRequest);
+    }
+
+    public void request_get_list_tickets_room() {
         JsonArrayRequest jsonObjReq = new JsonArrayRequest(com.android.volley.Request.Method.GET,
                 URL_LOAD_MESSAGES + idQueueRoom, null,
                 new com.android.volley.Response.Listener<JSONArray>() {
@@ -342,7 +579,7 @@ public class ChatActivity extends AppCompatActivity implements TextWatcher {
                     public void onResponse(JSONArray response) {
                         Log.d("ws", "messages" + response.toString());
                         JSONObject jsonObject = new JSONObject();
-                        for (int i = response.length()-1; i >= 0; i--) {
+                        for (int i = response.length() - 1; i >= 0; i--) {
                             try {
                                 jsonObject = new JSONObject();
                                 jsonObject.put("username", response.getJSONObject(i).getString("username"));
@@ -378,6 +615,5 @@ public class ChatActivity extends AppCompatActivity implements TextWatcher {
         RequestQueue requestQueue = Volley.newRequestQueue(this);
         requestQueue.add(jsonObjReq);
     }
-
 
 }

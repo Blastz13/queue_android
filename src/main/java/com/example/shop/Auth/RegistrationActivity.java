@@ -28,7 +28,7 @@ public class RegistrationActivity extends AppCompatActivity {
         setFragment(new SignInFragment());
     }
 
-    private void setFragment (Fragment fragment) {
+    private void setFragment(Fragment fragment) {
         FragmentTransaction fragmentTransaction = getSupportFragmentManager().beginTransaction();
         fragmentTransaction.replace(frameLayout.getId(), fragment);
         fragmentTransaction.commit();
