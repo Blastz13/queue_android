@@ -18,9 +18,6 @@
             android:name=".ListQueueRoomActivity"
             android:exported="false" />
         <activity
-            android:name=".SearchActivity"
-            android:exported="false" />
-        <activity
             android:name=".Category.AllProductsActivity"
             android:exported="false" />
         <activity
@@ -28,9 +25,6 @@
             android:exported="false" />
         <activity
             android:name=".Addresses.AddressActivity"
-            android:exported="false" />
-        <activity
-            android:name=".DeliveryActivity"
             android:exported="false" />
         <activity
             android:name=".Order.OrderDetailActivity"

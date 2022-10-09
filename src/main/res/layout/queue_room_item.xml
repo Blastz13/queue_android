@@ -48,7 +48,7 @@
                 android:backgroundTint="@color/green"
                 android:text="Open"
                 android:textAllCaps="false"
-                android:textSize="18dp"
+                android:textSize="16dp"
                 app:layout_constraintBottom_toBottomOf="parent"
                 app:layout_constraintEnd_toEndOf="parent" />
         </androidx.constraintlayout.widget.ConstraintLayout>
