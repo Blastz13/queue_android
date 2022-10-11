@@ -2,13 +2,23 @@ package com.example.shop;
 
 public class QueueTicketRoomModel {
     int queueId;
+    int userId;
     String status;
     String username;
 
-    public QueueTicketRoomModel(int queueId, String status, String username) {
+    public QueueTicketRoomModel(int queueId, int userId, String status, String username) {
         this.queueId = queueId;
+        this.userId = userId;
         this.status = status;
         this.username = username;
+    }
+
+    public int getUserId() {
+        return userId;
+    }
+
+    public void setUserId(int userId) {
+        this.userId = userId;
     }
 
     public int getQueueId() {

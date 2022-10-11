@@ -75,6 +75,8 @@ public class ChatActivity extends AppCompatActivity implements TextWatcher {
     private TextView hiddenQueueTicketBtn;
     private ConstraintLayout moreQueueTicket;
     Button addToQueueBtn;
+    Button updateToQueueBtn;
+    Button removeToQueueBtn;
     JSONObject currentQueueTicket;
     RecyclerView queueTicketRoomRecycler;
     QueueTicketRoomAdapter queueTicketRoomAdapter;
@@ -116,15 +118,49 @@ public class ChatActivity extends AppCompatActivity implements TextWatcher {
         moreQueueTicket = findViewById(R.id.moreQueueTicket);
         hiddenQueueTicketBtn = findViewById(R.id.hiddenQueueTicketBtn);
         addToQueueBtn = findViewById(R.id.AddToQueueBtn);
+        updateToQueueBtn = findViewById(R.id.updateToQueueBtn);
+        removeToQueueBtn = findViewById(R.id.removeToQueueBtn);
 
         addToQueueBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 request_add_to_queue();
-                addToQueueBtn.setVisibility(View.INVISIBLE);
+//                try {
+//                    refresh_queue_control();
+//                } catch (JSONException e) {
+//                    e.printStackTrace();
+//                }
             }
         });
 
+        updateToQueueBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                request_update_to_queue();
+                initiateSocketConnection();
+
+//                Log.d("ws", "REGRSHHH");
+//                try {
+//                    refresh_queue_control();
+//                } catch (JSONException e) {
+//                    e.printStackTrace();
+//                }
+            }
+        });
+
+        removeToQueueBtn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                request_remove_to_queue();
+                initiateSocketConnection();
+
+//                try {
+//                    refresh_queue_control();
+//                } catch (JSONException e) {
+//                    e.printStackTrace();
+//                }
+            }
+        });
         moreQueueTicketBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -145,7 +181,6 @@ public class ChatActivity extends AppCompatActivity implements TextWatcher {
         });
 
         messageEdit.addTextChangedListener(this);
-        request_get_current_ticket();
         sendBtn.setOnClickListener(v -> {
 
             JSONObject jsonObject = new JSONObject();
@@ -168,10 +203,16 @@ public class ChatActivity extends AppCompatActivity implements TextWatcher {
 
         });
 
+        request_get_current_ticket();
         request_get_current_user_id();
         request_get_next_queue_ticket();
         initiateSocketConnection();
         request_get_list_messages_room();
+//        try {
+//            refresh_queue_control();
+//        } catch (JSONException e) {
+//            e.printStackTrace();
+//        }
 
     }
 
@@ -239,8 +280,10 @@ public class ChatActivity extends AppCompatActivity implements TextWatcher {
                     JSONObject jsonObject = new JSONObject(text);
                     if (jsonObject.getString("action").equals("updateCurrentQueue")) {
                         if (!jsonObject.isNull("data")) {
+                            currentQueueTicket = jsonObject.getJSONObject("data").getJSONObject("user");
                             currentTicketEmail.setText(jsonObject.getJSONObject("data").getJSONObject("user").getString("username"));
                         } else {
+                            currentQueueTicket = null;
                             currentTicketEmail.setText("Is empty");
                         }
                     } else if (jsonObject.getString("action").equals("updateListQueue")) {
@@ -253,11 +296,12 @@ public class ChatActivity extends AppCompatActivity implements TextWatcher {
                         JSONArray data = jsonObject.getJSONArray("data");
                         queueTicketList = new ArrayList<>();
 
-                        for (int i = 1; i < data.length(); i++) {
+                        for (int i = 0; i < data.length(); i++) {
                             queueTicketList.add(new QueueTicketRoomModel(data.getJSONObject(i).getInt("id"),
+                                    data.getJSONObject(i).getJSONObject("user").getInt("id"),
                                     data.getJSONObject(i).getString("status"),
                                     data.getJSONObject(i).getJSONObject("user").getString("username")));
-
+                            Log.d("ws", "onMessage: " + queueTicketList.toString());
                         }
                         queueTicketRoomAdapter = new QueueTicketRoomAdapter(ChatActivity.this, queueTicketList);
                         queueTicketRoomRecycler.setAdapter(queueTicketRoomAdapter);
@@ -274,8 +318,29 @@ public class ChatActivity extends AppCompatActivity implements TextWatcher {
                     e.printStackTrace();
                 }
 
-            });
+                try {
+                    Log.d("ws", "onMessage: REFRESH WS CONTROLS");
+                    Log.d("ws", "onMessage: REFRESH WS CONTROLS size " + queueTicketList.size());
+                    refresh_queue_control();
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
 
+            });
+        }
+
+        @Override
+        public void onClosing(WebSocket webSocket, int code, String reason) {
+            super.onClosing(webSocket, code, reason);
+            Log.d("ws", "onClosing: ");
+            initiateSocketConnection();
+        }
+
+        @Override
+        public void onClosed(WebSocket webSocket, int code, String reason) {
+            super.onClosed(webSocket, code, reason);
+            initiateSocketConnection();
+            Log.d("ws", "onClosed: ");
         }
     }
 
@@ -325,6 +390,117 @@ public class ChatActivity extends AppCompatActivity implements TextWatcher {
             e.printStackTrace();
         }
 
+    }
+
+    private void refresh_queue_control() throws JSONException {
+//            if (currentQueueTicket != null){
+        Log.d("ws", "refresh_queue_control: NOT NULL");
+        addToQueueBtn.setVisibility(View.VISIBLE);
+        updateToQueueBtn.setVisibility(View.GONE);
+        removeToQueueBtn.setVisibility(View.GONE);
+
+        Log.d("ws", "refresh_queue_control: size" + queueTicketList.size());
+        for (int i = 0; i < queueTicketList.size(); i++) {
+            if (currentUserId == queueTicketList.get(i).getUserId()) {
+                Log.d("ws", "onResponse: REMOVE");
+                addToQueueBtn.setVisibility(View.GONE);
+                updateToQueueBtn.setVisibility(View.GONE);
+                removeToQueueBtn.setVisibility(View.VISIBLE);
+                break;
+            }
+        }
+
+        if (currentQueueTicket != null && currentUserId == currentQueueTicket.getInt("id")) {
+            Log.d("ws", "onResponse: UPDATE");
+
+            addToQueueBtn.setVisibility(View.GONE);
+            updateToQueueBtn.setVisibility(View.VISIBLE);
+            removeToQueueBtn.setVisibility(View.GONE);
+        }
+//                }
+//            }else {
+//                Log.d("ws", "refresh_queue_control: NULL");
+//                addToQueueBtn.setVisibility(View.VISIBLE);
+//                updateToQueueBtn.setVisibility(View.GONE);
+//                removeToQueueBtn.setVisibility(View.GONE);
+//
+//                RequestQueue requestQueue = Volley.newRequestQueue(this);
+//
+//                JsonObjectRequest stringRequest = new JsonObjectRequest(com.android.volley.Request.Method.GET, URL_CURRENT_TICKET, null,
+//                        new com.android.volley.Response.Listener<JSONObject>() {
+//                            @Override
+//                            public void onResponse(JSONObject response) {
+//                                try {
+//                                    Log.d("ws", "onResponse: REQUEST");
+//
+//                                    currentTicketEmail.setText(response.getJSONObject("user").getString("username"));
+//                                    currentQueueTicket = response.getJSONObject("user");
+//                                    Log.d("ws", "onResponse: ADD");
+//
+//                                    addToQueueBtn.setVisibility(View.VISIBLE);
+//                                    updateToQueueBtn.setVisibility(View.GONE);
+//                                    removeToQueueBtn.setVisibility(View.GONE);
+//                                    Log.d("ws", "onResponse:QUEUE TICKET LIST" + queueTicketList.size());
+//
+//                                    for (int i=0; i < queueTicketList.size(); i++){
+//                                        if (currentUserId == queueTicketList.get(i).getUserId()) {
+//                                            Log.d("ws", "onResponse: REMOVE");
+//                                            addToQueueBtn.setVisibility(View.GONE);
+//                                            updateToQueueBtn.setVisibility(View.GONE);
+//                                            removeToQueueBtn.setVisibility(View.VISIBLE);
+//                                            break;
+//                                        }
+//                                    }
+//
+//                                    if(currentUserId == currentQueueTicket.getInt("id")) {
+//                                        Log.d("ws", "onResponse: UPDATE");
+//
+//                                        addToQueueBtn.setVisibility(View.GONE);
+//                                        updateToQueueBtn.setVisibility(View.VISIBLE);
+//                                        removeToQueueBtn.setVisibility(View.GONE);
+//                                    }
+//
+//                                } catch (JSONException e) {
+//                                    e.printStackTrace();
+//                                    addToQueueBtn.setVisibility(View.VISIBLE);
+//                                    updateToQueueBtn.setVisibility(View.GONE);
+//                                    removeToQueueBtn.setVisibility(View.GONE);
+//                                }
+//                            }
+//                        }, new com.android.volley.Response.ErrorListener() {
+//                    @Override
+//                    public void onErrorResponse(VolleyError error) {
+//                        try {
+//                            String body = null;
+//                            String statusCode = String.valueOf(error.networkResponse.statusCode);
+//                            if (error.networkResponse.data != null) {
+//                                try {
+//                                    body = new String(error.networkResponse.data, "UTF-8");
+//                                } catch (UnsupportedEncodingException e) {
+//                                    e.printStackTrace();
+//                                }
+//                            }
+//                            try {
+//                                Toast.makeText(ChatActivity.this, new JSONObject(body).get("detail").toString(), Toast.LENGTH_LONG).show();
+//                            } catch (JSONException e) {
+//                                e.printStackTrace();
+//                            }
+//                        } catch (Exception e) {
+//                            currentTicketEmail.setText("Is empty");
+//                        }
+//                    }
+//                }) {
+//
+//                    /** Passing some request headers* */
+//                    @Override
+//                    public Map getHeaders() {
+//                        HashMap headers = new HashMap();
+//                        headers.put("Authorization", "Bearer " + JWT_TOKEN);
+//                        return headers;
+//                    }
+//                };
+//                requestQueue.add(stringRequest);
+//            }
     }
 
     private void request_get_current_user_id() {
@@ -402,6 +578,76 @@ public class ChatActivity extends AppCompatActivity implements TextWatcher {
                 } catch (JSONException e) {
                     e.printStackTrace();
                 }
+            }
+        }) {
+
+            /** Passing some request headers* */
+            @Override
+            public Map getHeaders() {
+                HashMap headers = new HashMap();
+                headers.put("Authorization", "Bearer " + JWT_TOKEN);
+                return headers;
+            }
+        };
+
+        requestQueue.add(stringRequest);
+    }
+
+    private void request_remove_to_queue() {
+        RequestQueue requestQueue = Volley.newRequestQueue(this);
+
+        JsonObjectRequest stringRequest = new JsonObjectRequest(com.android.volley.Request.Method.DELETE, "http://10.0.2.2:8000/queue/10/", null,
+                new com.android.volley.Response.Listener<JSONObject>() {
+                    @Override
+                    public void onResponse(JSONObject response) {
+                        ;
+                    }
+                }, new com.android.volley.Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+                String body = null;
+                String statusCode = String.valueOf(error.networkResponse.statusCode);
+                if (error.networkResponse.data != null) {
+                    try {
+                        body = new String(error.networkResponse.data, "UTF-8");
+                    } catch (UnsupportedEncodingException e) {
+                        e.printStackTrace();
+                    }
+                }
+                try {
+                    Toast.makeText(ChatActivity.this, new JSONObject(body).get("detail").toString(), Toast.LENGTH_LONG).show();
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+            }
+        }) {
+
+            /** Passing some request headers* */
+            @Override
+            public Map getHeaders() {
+                HashMap headers = new HashMap();
+                headers.put("Authorization", "Bearer " + JWT_TOKEN);
+                return headers;
+            }
+        };
+
+        requestQueue.add(stringRequest);
+    }
+
+
+    private void request_update_to_queue() {
+        RequestQueue requestQueue = Volley.newRequestQueue(this);
+        JSONObject jsonBody = new JSONObject();
+        JsonObjectRequest stringRequest = new JsonObjectRequest(com.android.volley.Request.Method.PUT, URL_ADD_TO_QUEUE_TICKET, jsonBody,
+                new com.android.volley.Response.Listener<JSONObject>() {
+                    @Override
+                    public void onResponse(JSONObject response) {
+                        ;
+                    }
+                }, new com.android.volley.Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+                ;
             }
         }) {
 
@@ -524,10 +770,11 @@ public class ChatActivity extends AppCompatActivity implements TextWatcher {
                             nextTicketEmail.setText("Is empty");
                         }
 
-                        for (int i = 1; i < response.length(); i++) {
+                        for (int i = 0; i < response.length(); i++) {
                             try {
                                 JSONObject obj = response.getJSONObject(i);
                                 queueTicketList.add(new QueueTicketRoomModel(obj.getInt("id"),
+                                        obj.getJSONObject("user").getInt("id"),
                                         obj.getString("status"),
                                         obj.getJSONObject("user").getString("username")));
                             } catch (JSONException e) {
@@ -535,6 +782,13 @@ public class ChatActivity extends AppCompatActivity implements TextWatcher {
                             }
                         }
                         queueTicketRoomAdapter.notifyDataSetChanged();
+                        try {
+                            Log.d("ws", "next load: refresh");
+                            Log.d("ws", "next load: dix" + queueTicketList.size());
+                            refresh_queue_control();
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                        }
                     }
 
                 }, new com.android.volley.Response.ErrorListener() {
