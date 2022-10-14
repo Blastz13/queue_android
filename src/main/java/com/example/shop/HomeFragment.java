@@ -30,6 +30,7 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 
@@ -68,7 +69,14 @@ public class HomeFragment extends Fragment {
             }
 
             public void afterTextChanged(Editable s) {
-                Log.d("ws", s.toString());
+                List<QueueRoomModel> queueRoomModelListSearch = new ArrayList<>();
+                for (int i=0; i < queueRoomModelList.size(); i++){
+                    if (queueRoomModelList.get(i).getTitle().toLowerCase().contains(s.toString().toLowerCase())) {
+                        queueRoomModelListSearch.add(queueRoomModelList.get(i));
+                    }
+                }
+                queueRoomAdapter = new QueueRoomAdapter(getActivity(), queueRoomModelListSearch);
+                queueRoomRecycler.setAdapter(queueRoomAdapter);
             }
         });
 

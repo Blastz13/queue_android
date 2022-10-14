@@ -20,15 +20,24 @@
             <include layout="@layout/profile_layout" />
 
             <Button
+                android:id="@+id/createNewRoomButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_margin="16dp"
+                android:backgroundTint="@color/green"
+                android:text="Create new room" />
+
+            <Button
                 android:id="@+id/sign_out_btn"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="300dp"
                 android:layout_marginLeft="16dp"
+                android:layout_marginTop="250dp"
                 android:layout_marginRight="16dp"
                 android:backgroundTint="@color/purple_500"
                 android:padding="16dp"
                 android:text="Выйти" />
+
         </LinearLayout>
     </ScrollView>
 

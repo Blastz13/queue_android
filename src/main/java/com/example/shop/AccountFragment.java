@@ -1,5 +1,6 @@
 package com.example.shop;
 
+import android.app.Dialog;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -7,12 +8,16 @@ import android.os.Bundle;
 
 import androidx.fragment.app.Fragment;
 
+import android.text.Editable;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import com.android.volley.Request;
 import com.android.volley.RequestQueue;
 import com.android.volley.VolleyError;
 import com.android.volley.toolbox.JsonObjectRequest;
@@ -30,12 +35,16 @@ import java.util.Map;
 public class AccountFragment extends Fragment {
 
     private Button signOutButton;
+    private Button createNewRoomButton;
     private static String URL_PROFILE = "http://10.0.2.2:8000/auth/profile/";
+    private static String URL_CREATE_ROOM = "http://10.0.2.2:8000/queue_room";
 
     private TextView name;
     SharedPreferences PreferenceStorage;
     String JWT_TOKEN;
     Integer currentUserId;
+    EditText titleCreateRoom;
+    Editable newTitleRoom;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
@@ -49,6 +58,72 @@ public class AccountFragment extends Fragment {
 
         signOutButton = view.findViewById(R.id.sign_out_btn);
         name = view.findViewById(R.id.name_account);
+
+        createNewRoomButton = view.findViewById(R.id.createNewRoomButton);
+        createNewRoomButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Dialog dialog = new Dialog(getContext());
+
+                // Установите заголовок
+                dialog.setTitle("Заголовок диалога");
+                // Передайте ссылку на разметку
+                dialog.setContentView(R.layout.dialog_create_room);
+                dialog.show();
+
+                titleCreateRoom = dialog.findViewById(R.id.titleCreateRoom);
+                newTitleRoom = titleCreateRoom.getText();
+                dialog.findViewById(R.id.createRoomBtn2).setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        RequestQueue requestQueue = Volley.newRequestQueue(getContext());
+                        JSONObject jsonObject = new JSONObject();
+                        try {
+                            jsonObject.put("title", newTitleRoom.toString());
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                        }
+
+                        JsonObjectRequest stringRequest = new JsonObjectRequest(Request.Method.POST, URL_CREATE_ROOM, jsonObject,
+                                new com.android.volley.Response.Listener<JSONObject>() {
+                                    @Override
+                                    public void onResponse(JSONObject response) {
+                                        ;
+                                    }
+                                }, new com.android.volley.Response.ErrorListener() {
+                            @Override
+                            public void onErrorResponse(VolleyError error) {
+                                try {
+                                    String body = null;
+                                    String statusCode = String.valueOf(error.networkResponse.statusCode);
+                                    if (error.networkResponse.data != null) {
+                                        try {
+                                            body = new String(error.networkResponse.data, "UTF-8");
+                                        } catch (UnsupportedEncodingException e) {
+                                            e.printStackTrace();
+                                        }
+                                    }
+                                } catch (Exception e) {
+                                    ;
+                                }
+                            }
+                        }) {
+
+                            /** Passing some request headers* */
+                            @Override
+                            public Map getHeaders() {
+                                HashMap headers = new HashMap();
+                                headers.put("Authorization", "Bearer " + JWT_TOKEN);
+                                return headers;
+                            }
+                        };
+
+                        requestQueue.add(stringRequest);
+                        dialog.dismiss();
+                    }
+                });
+            }
+        });
 
         signOutButton.setOnClickListener(new View.OnClickListener() {
             @Override
